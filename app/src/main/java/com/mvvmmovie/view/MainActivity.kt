@@ -33,7 +33,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prepareRecyclerView(context: Context) {
-        movieAdapter = MovieAdapter(context)
+        movieAdapter = MovieAdapter(context, MovieAdapter.OnClickListener { movie ->
+            // viewModel.toastMessage(this@MainActivity, movie)
+            viewModel.intentClass(this@MainActivity, movie)
+        })
         binding.rvMovies.apply {
             layoutManager = GridLayoutManager(applicationContext,2)
             adapter = movieAdapter
