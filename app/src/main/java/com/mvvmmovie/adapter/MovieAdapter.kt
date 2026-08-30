@@ -1,38 +1,45 @@
 package com.mvvmmovie.adapter
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.mvvmmovie.R
+import com.mvvmmovie.Utils
 import com.mvvmmovie.databinding.ItemMovieBinding
 import com.mvvmmovie.model.Movie
 
-class MovieAdapter(context: Context, private val onClickListener: OnClickListener) : RecyclerView.Adapter<MovieAdapter.ViewHolder>() {
-    private var movieList = ArrayList<Movie>()
-    @SuppressLint("NotifyDataSetChanged")
-    fun setMovieList(movieList : List<Movie>){
-        this.movieList = movieList as ArrayList<Movie>
-        notifyDataSetChanged()
-    }
-    class ViewHolder(val binding : ItemMovieBinding) : RecyclerView.ViewHolder(binding.root)
+class MovieAdapter(
+    private val onMovieClick: (Movie) -> Unit
+) : ListAdapter<Movie, MovieAdapter.ViewHolder>(DIFF_CALLBACK) {
+
+    class ViewHolder(val binding: ItemMovieBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        return ViewHolder(ItemMovieBinding.inflate(LayoutInflater.from(parent.context)))
-    }
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        Glide.with(holder.itemView).load("https://image.tmdb.org/t/p/w500"+movieList[position].poster_path).into(holder.binding.ivMovieImage)
-        holder.binding.tvMovieName.text = movieList[position].title
-        holder.itemView.setOnClickListener {
-            onClickListener.onClick(movieList[position])
-        }
-    }
-    override fun getItemCount(): Int {
-        return movieList.size
+        // Passing parent keeps the item's own layout params instead of dropping them.
+        return ViewHolder(ItemMovieBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     }
 
-    class OnClickListener(val clickListener: (movie: Movie) -> Unit) {
-        fun onClick(movie: Movie) = clickListener(movie)
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val movie = getItem(position)
+        Glide.with(holder.itemView)
+            .load(Utils.IMAGE_URL + movie.poster_path)
+            .placeholder(R.drawable.ic_no_exist)
+            .error(R.drawable.ic_no_exist)
+            .into(holder.binding.ivMovieImage)
+        holder.binding.tvMovieName.text = movie.title
+        holder.binding.ivMovieImage.contentDescription = movie.title
+        holder.itemView.setOnClickListener { onMovieClick(movie) }
+    }
+
+    private companion object {
+        val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Movie>() {
+            override fun areItemsTheSame(oldItem: Movie, newItem: Movie) = oldItem.id == newItem.id
+
+            override fun areContentsTheSame(oldItem: Movie, newItem: Movie) =
+                oldItem.title == newItem.title && oldItem.poster_path == newItem.poster_path
+        }
     }
 }

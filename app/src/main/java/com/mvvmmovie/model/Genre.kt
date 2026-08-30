@@ -1,10 +1,9 @@
 package com.mvvmmovie.model
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.google.gson.annotations.SerializedName
+import java.io.Serializable
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-class Genre {
+class Genre : Serializable {
 
     @SerializedName("id")
     var id: Int? = null

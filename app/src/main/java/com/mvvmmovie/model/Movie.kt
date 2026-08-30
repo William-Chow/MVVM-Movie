@@ -1,10 +1,8 @@
 package com.mvvmmovie.model
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.google.gson.annotations.SerializedName
 import java.io.Serializable
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 class Movie : Serializable {
 
     @SerializedName("adult")
@@ -86,7 +84,6 @@ class Movie : Serializable {
     var vote_count: Int? = null
 }
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 class BelongToCollection : Serializable {
     @SerializedName("id")
     var id: Int? = null
@@ -101,7 +98,6 @@ class BelongToCollection : Serializable {
     var backdrop_path: String? = null
 }
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 class ProductionCompanies : Serializable {
 
     @SerializedName("id")
@@ -117,7 +113,6 @@ class ProductionCompanies : Serializable {
     var origin_country: String? = null
 }
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 class ProductionCountries : Serializable {
 
     @SerializedName("iso_3166_1")
@@ -127,7 +122,6 @@ class ProductionCountries : Serializable {
     var name: String? = null
 }
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 class SpokenLanguages : Serializable {
     @SerializedName("english_name")
     var english_name: String? = null
