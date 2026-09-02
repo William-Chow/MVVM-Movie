@@ -1,12 +1,40 @@
 <resources>
     <string name="app_name">MVVMMovie</string>
     <string name="movie_name">Movie Name</string>
-    <string name="overview">Overview</string>
     <string name="title">Title</string>
+
     <string name="search_hint">Search movies</string>
     <string name="retry">Retry</string>
     <string name="error_unknown">Something went wrong. Please try again.</string>
+    <string name="error_no_network">No network connection. Check your connection and retry.</string>
     <string name="empty_result">No movies found</string>
+    <string name="empty_favorites">No favourites yet. Star a movie to keep it here.</string>
+    <string name="offline_showing_cached">Offline — showing the last loaded list</string>
     <string name="no_overview">No overview available.</string>
     <string name="rating_format">★ %1$.1f</string>
+
+    <string name="action_lists">Lists</string>
+    <string name="action_sort">Sort</string>
+    <string name="action_favorites">Favourites</string>
+    <string name="action_favorite">Add to favourites</string>
+    <string name="action_unfavorite">Remove from favourites</string>
+
+    <string name="category_popular">Popular</string>
+    <string name="category_now_playing">Now playing</string>
+    <string name="category_top_rated">Top rated</string>
+    <string name="category_upcoming">Upcoming</string>
+
+    <string name="sort_default">Default order</string>
+    <string name="sort_rating">Rating</string>
+    <string name="sort_release_date">Release date</string>
+    <string name="sort_title">Title</string>
+
+    <string name="label_cast">Cast</string>
+    <string name="label_trailers">Trailers</string>
+    <string name="label_similar">Similar titles</string>
+    <string name="runtime_format">%1$dh %2$02dm</string>
+    <string name="runtime_minutes_format">%1$dm</string>
+    <string name="budget_format">Budget %1$s</string>
+    <string name="revenue_format">Revenue %1$s</string>
+    <string name="no_video_app">No app available to play this trailer.</string>
 </resources>

@@ -82,6 +82,17 @@ class Movie : Serializable {
 
     @SerializedName("vote_count")
     var vote_count: Int? = null
+
+    // Populated only by the detail call, which asks for append_to_response.
+
+    @SerializedName("credits")
+    var credits: Credits? = null
+
+    @SerializedName("videos")
+    var videos: Videos? = null
+
+    @SerializedName("similar")
+    var similar: Movies? = null
 }
 
 class BelongToCollection : Serializable {

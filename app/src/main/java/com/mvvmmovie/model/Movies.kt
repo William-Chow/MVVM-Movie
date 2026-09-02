@@ -1,8 +1,9 @@
 package com.mvvmmovie.model
 
 import com.google.gson.annotations.SerializedName
+import java.io.Serializable
 
-class Movies {
+class Movies : Serializable {
 
     @SerializedName("page")
     var page: Int? = null

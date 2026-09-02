@@ -7,6 +7,35 @@
         android:icon="@android:drawable/ic_menu_search"
         android:title="@string/search_hint"
         app:actionViewClass="androidx.appcompat.widget.SearchView"
-        app:showAsAction="always|collapseActionView" />
+        app:showAsAction="ifRoom|collapseActionView" />
+
+    <item
+        android:id="@+id/action_lists"
+        android:title="@string/action_lists"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/category_popular" android:title="@string/category_popular" />
+                <item android:id="@+id/category_now_playing" android:title="@string/category_now_playing" />
+                <item android:id="@+id/category_top_rated" android:title="@string/category_top_rated" />
+                <item android:id="@+id/category_upcoming" android:title="@string/category_upcoming" />
+                <item android:id="@+id/action_favorites" android:title="@string/action_favorites" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/action_sort"
+        android:title="@string/action_sort"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/sort_default" android:title="@string/sort_default" />
+                <item android:id="@+id/sort_rating" android:title="@string/sort_rating" />
+                <item android:id="@+id/sort_release_date" android:title="@string/sort_release_date" />
+                <item android:id="@+id/sort_title" android:title="@string/sort_title" />
+            </group>
+        </menu>
+    </item>
 
 </menu>
