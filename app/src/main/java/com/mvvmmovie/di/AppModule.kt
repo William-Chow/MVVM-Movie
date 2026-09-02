@@ -1,12 +1,8 @@
 package com.mvvmmovie.di
 
 import android.content.Context
-import androidx.room.Room
 import com.mvvmmovie.BuildConfig
-import com.mvvmmovie.data.local.MovieDao
-import com.mvvmmovie.data.local.MovieDatabase
 import com.mvvmmovie.network.ApiKeyInterceptor
-import com.mvvmmovie.network.MovieApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -55,16 +51,4 @@ object AppModule {
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
-    @Provides
-    @Singleton
-    fun provideMovieApi(retrofit: Retrofit): MovieApi = retrofit.create(MovieApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideMovieDatabase(@ApplicationContext context: Context): MovieDatabase =
-        Room.databaseBuilder(context, MovieDatabase::class.java, "movies.db").build()
-
-    @Provides
-    @Singleton
-    fun provideMovieDao(database: MovieDatabase): MovieDao = database.movieDao()
 }
