@@ -82,10 +82,7 @@ class MainActivity : AppCompatActivity() {
                     movieAdapter.submitList(emptyList())
                 }
                 is MovieUiState.Error -> {
-                    binding.tvError.text = when {
-                        state.offline -> getString(R.string.error_no_network)
-                        else -> state.message ?: getString(R.string.error_unknown)
-                    }
+                    binding.tvError.setText(state.reason.messageRes)
                     movieAdapter.submitList(emptyList())
                 }
                 MovieUiState.Loading -> Unit
@@ -97,9 +94,9 @@ class MainActivity : AppCompatActivity() {
             binding.progressBarMore.isVisible = loadingMore
         }
 
-        viewModel.observeMessage().observe(this@MainActivity) { message ->
-            if (message == null) return@observe
-            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+        viewModel.observeMessage().observe(this@MainActivity) { error ->
+            if (error == null) return@observe
+            Toast.makeText(this@MainActivity, error.messageRes, Toast.LENGTH_SHORT).show()
             viewModel.onMessageShown()
         }
 

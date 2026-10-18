@@ -2,6 +2,7 @@ package com.mvvmmovie.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mvvmmovie.model.Movie
@@ -9,17 +10,18 @@ import com.mvvmmovie.model.MovieCategory
 import com.mvvmmovie.model.MovieSort
 import com.mvvmmovie.model.MovieSource
 import com.mvvmmovie.model.Movies
-import com.mvvmmovie.network.OfflineException
 import com.mvvmmovie.repository.MovieRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltViewModel
 class MovieViewModel @Inject constructor(
-    private val repository: MovieRepository
+    private val repository: MovieRepository,
+    private val savedState: SavedStateHandle
 ) : ViewModel() {
 
     private val loadedMovies = mutableListOf<Movie>()
@@ -29,23 +31,35 @@ class MovieViewModel @Inject constructor(
     private var loadJob: Job? = null
     private var favoritesJob: Job? = null
 
-    private val uiState = MutableLiveData<MovieUiState>()
-    private val loadingMore = MutableLiveData(false)
-    private val message = MutableLiveData<String?>()
-    private val sourceState = MutableLiveData<MovieSource>()
-    private val sortState = MutableLiveData(MovieSort.DEFAULT)
-
-    private var source: MovieSource = MovieSource.Category(MovieCategory.POPULAR)
+    // Which list is showing, the list a search replaced and the sort order are kept in
+    // SavedStateHandle so they survive process death; the movies themselves are refetched.
+    private var source: MovieSource = savedState[KEY_SOURCE] ?: DEFAULT_SOURCE
         set(value) {
             field = value
+            savedState[KEY_SOURCE] = value
             sourceState.value = value
         }
-    private var sort: MovieSort = MovieSort.DEFAULT
+    private var sourceBeforeSearch: MovieSource? = savedState[KEY_SOURCE_BEFORE_SEARCH]
+        set(value) {
+            field = value
+            savedState[KEY_SOURCE_BEFORE_SEARCH] = value
+        }
+    private var sort: MovieSort = savedState[KEY_SORT] ?: MovieSort.DEFAULT
+        set(value) {
+            field = value
+            savedState[KEY_SORT] = value
+            sortState.value = value
+        }
+
+    private val uiState = MutableLiveData<MovieUiState>()
+    private val loadingMore = MutableLiveData(false)
+    private val message = MutableLiveData<LoadError?>()
+    private val sourceState = MutableLiveData(source)
+    private val sortState = MutableLiveData(sort)
 
     init {
         // Loading here instead of from the Activity means a rotation reuses the data
         // already in memory rather than firing the same request again.
-        sourceState.value = source
         load(page = FIRST_PAGE)
     }
 
@@ -53,7 +67,7 @@ class MovieViewModel @Inject constructor(
 
     fun observeLoadingMore(): LiveData<Boolean> = loadingMore
 
-    fun observeMessage(): LiveData<String?> = message
+    fun observeMessage(): LiveData<LoadError?> = message
 
     fun observeSource(): LiveData<MovieSource> = sourceState
 
@@ -62,27 +76,32 @@ class MovieViewModel @Inject constructor(
     /** Reloads from page one. Backs both pull-to-refresh and the retry button. */
     fun refresh() = load(page = FIRST_PAGE)
 
-    fun selectCategory(category: MovieCategory) = switchTo(MovieSource.Category(category))
+    fun selectCategory(category: MovieCategory) = showList(MovieSource.Category(category))
 
-    fun showFavorites() = switchTo(MovieSource.Favorites)
+    fun showFavorites() = showList(MovieSource.Favorites)
 
-    /** Switches the grid to a search; a null or blank keyword restores the popular list. */
+    /**
+     * Switches the grid to a search. A null or blank keyword leaves the search and goes back to
+     * the list it replaced; with no search showing, it changes nothing.
+     */
     fun search(keyword: String?) {
         val normalized = keyword?.trim()?.takeIf { it.isNotEmpty() }
-        val target = if (normalized == null) {
-            MovieSource.Category(MovieCategory.POPULAR)
-        } else {
-            MovieSource.Search(normalized)
+        if (normalized == null) {
+            if (source is MovieSource.Search) switchTo(sourceBeforeSearch ?: DEFAULT_SOURCE)
+            sourceBeforeSearch = null
+            return
         }
-        switchTo(target)
+        if (source !is MovieSource.Search) sourceBeforeSearch = source
+        switchTo(MovieSource.Search(normalized))
     }
 
     /** Reorders whatever pages are currently loaded; it does not re-query TMDB. */
     fun sortBy(order: MovieSort) {
         if (order == sort) return
         sort = order
-        sortState.value = order
-        publish()
+        // While a new list loads, or after it failed, the movies in memory are not what the
+        // grid shows; the next publish() picks the new order up.
+        if (uiState.value is MovieUiState.Success) publish()
     }
 
     /** Ignored while a request is in flight, on the last page, or for the local favourites list. */
@@ -96,6 +115,12 @@ class MovieViewModel @Inject constructor(
         message.value = null
     }
 
+    /** A list picked from the menu replaces any search, so leaving the search later stays on it. */
+    private fun showList(target: MovieSource) {
+        sourceBeforeSearch = null
+        switchTo(target)
+    }
+
     private fun switchTo(target: MovieSource) {
         if (target == source) return
         source = target
@@ -105,6 +130,8 @@ class MovieViewModel @Inject constructor(
     private fun load(page: Int) {
         loadJob?.cancel()
         favoritesJob?.cancel()
+        // A cancelled page request never reaches the line that hides its spinner.
+        loadingMore.value = false
 
         if (source == MovieSource.Favorites) {
             observeFavorites()
@@ -115,7 +142,6 @@ class MovieViewModel @Inject constructor(
         loadJob = viewModelScope.launch {
             if (page == FIRST_PAGE) {
                 uiState.value = MovieUiState.Loading
-                loadingMore.value = false
             } else {
                 loadingMore.value = true
             }
@@ -144,29 +170,35 @@ class MovieViewModel @Inject constructor(
         }
     }
 
-    private suspend fun onPageLoaded(source: MovieSource.Remote, page: Int, movies: Movies) {
+    private fun onPageLoaded(source: MovieSource.Remote, page: Int, movies: Movies) {
         if (page == FIRST_PAGE) loadedMovies.clear()
         // TMDB can repeat a movie across consecutive pages; keep the grid free of duplicates.
         val knownIds = loadedMovies.mapNotNull { it.id }.toMutableSet()
         val fresh = movies.results.orEmpty().filter { it.id == null || knownIds.add(it.id!!) }
         loadedMovies += fresh
         lastLoadedPage = movies.page ?: page
-        totalPages = movies.total_pages ?: lastLoadedPage
+        // total_pages can run into the tens of thousands, but TMDB rejects any page past MAX_PAGE.
+        totalPages = minOf(movies.total_pages ?: lastLoadedPage, MAX_PAGE)
         servedFromCache = false
-
-        if (page == FIRST_PAGE) repository.cacheFirstPage(source, loadedMovies.toList())
         publish()
+
+        if (page == FIRST_PAGE) {
+            // Written after the grid is updated so the UI never waits on Room.
+            val firstPage = loadedMovies.toList()
+            viewModelScope.launch { repository.cacheFirstPage(source, firstPage) }
+        }
     }
 
     private suspend fun onPageFailed(source: MovieSource.Remote, page: Int, error: Throwable) {
         if (page != FIRST_PAGE) {
             // Keep the pages already on screen; scrolling again retries the next one.
-            message.value = error.message
+            message.value = error.toLoadError()
             return
         }
 
         // Nothing on screen, so fall back to the last good copy of this list before erroring out.
-        val cached = repository.cachedMovies(source)
+        // Only a connection problem does: an HTTP or parsing error is reported, not shown as "offline".
+        val cached = if (error is IOException) repository.cachedMovies(source) else emptyList()
         if (cached.isNotEmpty()) {
             loadedMovies.clear()
             loadedMovies += cached
@@ -178,7 +210,7 @@ class MovieViewModel @Inject constructor(
         }
 
         loadedMovies.clear()
-        uiState.value = MovieUiState.Error(error.message, error is OfflineException)
+        uiState.value = MovieUiState.Error(error.toLoadError())
     }
 
     private fun publish() {
@@ -198,5 +230,14 @@ class MovieViewModel @Inject constructor(
 
     private companion object {
         const val FIRST_PAGE = 1
+
+        /** TMDB's list and search endpoints refuse page numbers above this. */
+        const val MAX_PAGE = 500
+
+        val DEFAULT_SOURCE: MovieSource = MovieSource.Category(MovieCategory.POPULAR)
+
+        const val KEY_SOURCE = "source"
+        const val KEY_SOURCE_BEFORE_SEARCH = "sourceBeforeSearch"
+        const val KEY_SORT = "sort"
     }
 }

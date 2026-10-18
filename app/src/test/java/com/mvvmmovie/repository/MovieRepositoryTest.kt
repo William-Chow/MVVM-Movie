@@ -129,6 +129,47 @@ class MovieRepositoryTest {
     }
 
     @Test
+    fun cacheFirstPage_forSearches_keepsOnlyTheLatestSearch() = runTest {
+        val repository = repository()
+        repository.cacheFirstPage(MovieSource.Category(MovieCategory.POPULAR), listOf(movie(1)))
+
+        repository.cacheFirstPage(MovieSource.Search("dune"), listOf(movie(2)))
+        repository.cacheFirstPage(MovieSource.Search("arrival"), listOf(movie(3)))
+
+        assertEquals(setOf("category:popular", "search:arrival"), dao.cachedListKeys)
+        assertEquals(listOf(3), repository.cachedMovies(MovieSource.Search("arrival")).map { it.id })
+    }
+
+    @Test
+    fun cachedSearch_isFoundWhateverTheCaseOfTheQuery() = runTest {
+        val repository = repository()
+
+        repository.cacheFirstPage(MovieSource.Search("Dune"), listOf(movie(2)))
+
+        assertEquals(listOf(2), repository.cachedMovies(MovieSource.Search("dune")).map { it.id })
+    }
+
+    @Test
+    fun cacheFirstPage_dropsAFailedWriteInsteadOfThrowing() = runTest {
+        dao.failCacheWrites = true
+
+        repository().cacheFirstPage(MovieSource.Category(MovieCategory.POPULAR), listOf(movie(1)))
+
+        assertTrue(dao.cachedListKeys.isEmpty())
+    }
+
+    @Test
+    fun savedMovie_prefersTheFavouriteThenAnyCachedCopy() = runTest {
+        val repository = repository()
+        repository.cacheFirstPage(MovieSource.Category(MovieCategory.POPULAR), listOf(movie(1, title = "Cached"), movie(2)))
+        repository.setFavorite(movie(1, title = "Favourite"), favorite = true)
+
+        assertEquals("Favourite", repository.savedMovie(1)?.title)
+        assertEquals("Movie 2", repository.savedMovie(2)?.title)
+        assertEquals(null, repository.savedMovie(3))
+    }
+
+    @Test
     fun setFavorite_addsAndRemoves() = runTest {
         val repository = repository()
 

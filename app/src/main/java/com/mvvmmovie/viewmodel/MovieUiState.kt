@@ -18,7 +18,7 @@ sealed interface MovieUiState {
     data class Success(val movies: List<Movie>, val fromCache: Boolean = false) : MovieUiState
 
     /** The first page failed and the grid is blank; the user can retry. */
-    data class Error(val message: String?, val offline: Boolean) : MovieUiState
+    data class Error(val reason: LoadError) : MovieUiState
 }
 
 /** What the detail screen should be showing right now. */
@@ -26,7 +26,11 @@ sealed interface MovieDetailUiState {
 
     data object Loading : MovieDetailUiState
 
-    data class Success(val movie: Movie) : MovieDetailUiState
+    /**
+     * [fromSavedCopy] marks a movie rebuilt from what Room kept (a favourite or a cached list
+     * entry) because the network was unreachable, so cast, trailers and similar titles are absent.
+     */
+    data class Success(val movie: Movie, val fromSavedCopy: Boolean = false) : MovieDetailUiState
 
-    data class Error(val message: String?, val offline: Boolean) : MovieDetailUiState
+    data class Error(val reason: LoadError) : MovieDetailUiState
 }

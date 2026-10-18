@@ -9,7 +9,7 @@
  - Detail screen with genres, runtime, tagline, budget and revenue, cast, trailers and similar titles
  - Favourites, stored locally in Room
  - Client-side sorting of the loaded list by rating, release date or title
- - Offline fallback: the last loaded first page is cached and shown when the network is unreachable
+ - Offline fallback: the last loaded first page of each list (and of the latest search) is cached and shown when the network is unreachable, and a movie already saved on the device still opens on the detail screen
  - Loading / empty / error states with retry, plus pull to refresh
 
  **Setup:** add your TMDB v3 key to `local.properties`:
@@ -17,6 +17,8 @@
  ```properties
  TMDB_API_KEY=your_key_here
  ```
+
+ Debug builds and unit tests run without it (with a warning); packaging a release fails until it is set.
 
 
 https://user-images.githubusercontent.com/8773222/230867850-08d92276-fa11-4ac1-9056-1a44d62cf6aa.mp4

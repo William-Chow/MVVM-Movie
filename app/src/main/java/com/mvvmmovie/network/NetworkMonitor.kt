@@ -22,13 +22,18 @@ class AndroidNetworkMonitor @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : NetworkMonitor {
 
+    /**
+     * Deliberately does not require NET_CAPABILITY_VALIDATED: validation fails on networks that
+     * block Android's connectivity check, behind some VPNs, and for a few seconds after joining
+     * Wi-Fi, all while TMDB is reachable. A network that only claims internet is let through,
+     * and a request that then fails surfaces as an ordinary connection error.
+     */
     override fun isOnline(): Boolean {
         val connectivityManager = context.getSystemService<ConnectivityManager>() ?: return true
         val capabilities = connectivityManager.getNetworkCapabilities(
             connectivityManager.activeNetwork ?: return false
         ) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }
 

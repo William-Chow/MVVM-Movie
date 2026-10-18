@@ -7,10 +7,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.mvvmmovie.model.Movie
-import com.mvvmmovie.network.OfflineException
 import com.mvvmmovie.repository.MovieRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -41,18 +41,22 @@ class ViewMovieViewModel @Inject constructor(
 
     fun load() {
         if (movieId == NO_ID) {
-            uiState.value = MovieDetailUiState.Error(null, offline = false)
+            uiState.value = MovieDetailUiState.Error(LoadError.UNKNOWN)
             return
         }
         viewModelScope.launch {
             uiState.value = MovieDetailUiState.Loading
             repository.getMovieDetail(movieId)
-                .onSuccess { movie ->
-                    loadedMovie = movie
-                    uiState.value = MovieDetailUiState.Success(movie)
-                }
+                .onSuccess { movie -> show(movie, fromSavedCopy = false) }
                 .onFailure { error ->
-                    uiState.value = MovieDetailUiState.Error(error.message, error is OfflineException)
+                    // Without a connection, fall back to what the grid or the favourites kept, so
+                    // a movie already on the device still opens (and can be unfavourited) offline.
+                    val saved = if (error is IOException) repository.savedMovie(movieId) else null
+                    if (saved != null) {
+                        show(saved, fromSavedCopy = true)
+                    } else {
+                        uiState.value = MovieDetailUiState.Error(error.toLoadError())
+                    }
                 }
         }
     }
@@ -61,6 +65,11 @@ class ViewMovieViewModel @Inject constructor(
         val movie = loadedMovie ?: return
         val nowFavorite = isFavorite.value != true
         viewModelScope.launch { repository.setFavorite(movie, nowFavorite) }
+    }
+
+    private fun show(movie: Movie, fromSavedCopy: Boolean) {
+        loadedMovie = movie
+        uiState.value = MovieDetailUiState.Success(movie, fromSavedCopy)
     }
 
     companion object {

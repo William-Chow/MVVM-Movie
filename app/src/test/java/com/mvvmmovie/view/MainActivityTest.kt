@@ -104,7 +104,8 @@ class MainActivityTest {
             settle()
             scenario.onActivity { activity ->
                 assertEquals(android.view.View.VISIBLE, activity.findViewById<android.view.View>(R.id.errorContainer).visibility)
-                assertEquals("boom", activity.findViewById<TextView>(R.id.tvError).text.toString())
+                // The raw exception text stays out of the UI.
+                assertEquals(activity.getString(R.string.error_network), activity.findViewById<TextView>(R.id.tvError).text.toString())
             }
         }
     }

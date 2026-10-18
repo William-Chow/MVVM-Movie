@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -118,6 +119,31 @@ class MovieDaoTest {
     @Test
     fun cachedMovies_forAnUnknownList_isEmpty() = runTest {
         assertTrue(dao.cachedMovies("nothing-here").isEmpty())
+    }
+
+    @Test
+    fun replaceCachesWithPrefix_leavesOnlyTheNewListUnderThatPrefix() = runTest {
+        dao.insertCache(listOf(cached("search:dune", id = 1, position = 0)))
+        dao.insertCache(listOf(cached("search:heat", id = 2, position = 0)))
+        dao.insertCache(listOf(cached("category:popular", id = 3, position = 0)))
+
+        dao.replaceCachesWithPrefix("search:", listOf(cached("search:arrival", id = 4, position = 0)))
+
+        assertTrue(dao.cachedMovies("search:dune").isEmpty())
+        assertTrue(dao.cachedMovies("search:heat").isEmpty())
+        assertEquals(listOf(4), dao.cachedMovies("search:arrival").map { it.id })
+        assertEquals(listOf(3), dao.cachedMovies("category:popular").map { it.id })
+    }
+
+    @Test
+    fun favorite_andCachedMovie_lookUpASingleMovieById() = runTest {
+        dao.addFavorite(favorite(1))
+        dao.insertCache(listOf(cached("popular", id = 2, position = 0)))
+
+        assertEquals("Movie 1", dao.favorite(1)?.title)
+        assertNull(dao.favorite(2))
+        assertEquals("Movie 2", dao.cachedMovie(2)?.title)
+        assertNull(dao.cachedMovie(1))
     }
 
     private fun favorite(id: Int, title: String = "Movie $id", addedAt: Long = id.toLong()) =

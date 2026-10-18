@@ -1,8 +1,10 @@
 package com.mvvmmovie.di
 
 import android.content.Context
+import android.util.Log
 import com.mvvmmovie.BuildConfig
 import com.mvvmmovie.network.ApiKeyInterceptor
+import com.mvvmmovie.network.TmdbApiKey
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,9 +23,11 @@ import javax.inject.Singleton
 object AppModule {
 
     private const val CACHE_BYTES = 10L * 1024 * 1024
+    private const val HTTP_LOG_TAG = "OkHttp"
 
     @Provides
     @Singleton
+    @TmdbApiKey
     fun provideApiKey(): String = BuildConfig.TMDB_API_KEY
 
     @Provides
@@ -38,7 +42,10 @@ object AppModule {
         .addInterceptor(apiKeyInterceptor)
         .apply {
             if (BuildConfig.DEBUG) {
-                addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
+                val logger = HttpLoggingInterceptor { message ->
+                    Log.d(HTTP_LOG_TAG, ApiKeyInterceptor.redact(message))
+                }
+                addInterceptor(logger.setLevel(HttpLoggingInterceptor.Level.BASIC))
             }
         }
         .build()

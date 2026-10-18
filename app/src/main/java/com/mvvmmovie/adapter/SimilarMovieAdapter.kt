@@ -5,10 +5,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.mvvmmovie.R
-import com.mvvmmovie.Utils
 import com.mvvmmovie.databinding.ItemMovieCompactBinding
+import com.mvvmmovie.loadTmdbImage
 import com.mvvmmovie.model.Movie
 
 /** Compact, fixed-width poster used by the horizontal "similar titles" row. */
@@ -23,11 +21,7 @@ class SimilarMovieAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val movie = getItem(position)
-        Glide.with(holder.itemView)
-            .load(Utils.IMAGE_URL + movie.poster_path)
-            .placeholder(R.drawable.ic_no_exist)
-            .error(R.drawable.ic_no_exist)
-            .into(holder.binding.ivPoster)
+        holder.binding.ivPoster.loadTmdbImage(movie.poster_path)
         holder.binding.tvName.text = movie.title
         holder.binding.ivPoster.contentDescription = movie.title
         holder.itemView.setOnClickListener { onMovieClick(movie) }

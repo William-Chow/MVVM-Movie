@@ -15,15 +15,13 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.RequestOptions
 import com.mvvmmovie.R
 import com.mvvmmovie.Utils
 import com.mvvmmovie.adapter.CastAdapter
 import com.mvvmmovie.adapter.SimilarMovieAdapter
 import com.mvvmmovie.adapter.VideoAdapter
 import com.mvvmmovie.databinding.ActivityViewMovieBinding
+import com.mvvmmovie.loadTmdbImage
 import com.mvvmmovie.model.Movie
 import com.mvvmmovie.model.Video
 import com.mvvmmovie.viewmodel.MovieDetailUiState
@@ -54,19 +52,18 @@ class ViewMovieActivity : AppCompatActivity() {
         binding.rvSimilar.adapter = similarAdapter
         binding.rvTrailers.adapter = videoAdapter
         binding.btnRetry.setOnClickListener { viewModel.load() }
+        binding.tvSavedCopyBanner.setOnClickListener { viewModel.load() }
         addMenuProvider(favoriteMenuProvider, this@ViewMovieActivity)
 
         viewModel.observeUiState().observe(this@ViewMovieActivity) { state ->
             binding.progressBar.isVisible = state is MovieDetailUiState.Loading
             binding.errorContainer.isVisible = state is MovieDetailUiState.Error
             binding.content.isVisible = state is MovieDetailUiState.Success
+            binding.tvSavedCopyBanner.isVisible = state is MovieDetailUiState.Success && state.fromSavedCopy
 
             when (state) {
                 is MovieDetailUiState.Success -> setupUI(state.movie)
-                is MovieDetailUiState.Error -> binding.tvError.text = when {
-                    state.offline -> getString(R.string.error_no_network)
-                    else -> state.message ?: getString(R.string.error_unknown)
-                }
+                is MovieDetailUiState.Error -> binding.tvError.setText(state.reason.messageRes)
                 MovieDetailUiState.Loading -> Unit
             }
             invalidateOptionsMenu()
@@ -94,15 +91,7 @@ class ViewMovieActivity : AppCompatActivity() {
             movie.production_companies?.mapNotNull { it.name }?.joinToString(SEPARATOR)
         )
 
-        // .apply(RequestOptions) is the Glide call; the Kotlin scope function that used to
-        // be here built the options and threw them away.
-        Glide.with(this@ViewMovieActivity)
-            .load(Utils.IMAGE_URL + movie.poster_path)
-            .apply(RequestOptions().diskCacheStrategy(DiskCacheStrategy.ALL))
-            .placeholder(R.drawable.ic_no_exist)
-            .error(R.drawable.ic_no_exist)
-            .dontAnimate()
-            .into(binding.ivImage)
+        binding.ivImage.loadTmdbImage(movie.poster_path)
         binding.ivImage.contentDescription = movie.title
 
         val cast = movie.credits?.cast.orEmpty().take(MAX_CAST)

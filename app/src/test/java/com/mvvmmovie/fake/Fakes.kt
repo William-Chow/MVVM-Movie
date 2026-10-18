@@ -22,6 +22,12 @@ class FakeMovieDao : MovieDao {
     private val favorites = MutableStateFlow<List<FavoriteMovie>>(emptyList())
     private val cache = mutableMapOf<String, List<CachedMovie>>()
 
+    /** Makes every cache write throw, the way a full disk would. */
+    var failCacheWrites = false
+
+    /** Every list key that currently holds a cached copy. */
+    val cachedListKeys: Set<String> get() = cache.keys.toSet()
+
     override fun observeFavorites(): Flow<List<FavoriteMovie>> = favorites
 
     override fun observeIsFavorite(id: Int): Flow<Boolean> =
@@ -35,24 +41,39 @@ class FakeMovieDao : MovieDao {
         favorites.value = favorites.value.filterNot { it.id == id }
     }
 
+    override suspend fun favorite(id: Int): FavoriteMovie? = favorites.value.firstOrNull { it.id == id }
+
     override suspend fun cachedMovies(listKey: String): List<CachedMovie> =
         cache[listKey].orEmpty()
 
+    override suspend fun cachedMovie(id: Int): CachedMovie? =
+        cache.values.flatten().firstOrNull { it.id == id }
+
     override suspend fun clearCache(listKey: String) {
+        checkWritable()
         cache.remove(listKey)
     }
 
+    override suspend fun clearCachesWithPrefix(prefix: String) {
+        checkWritable()
+        cache.keys.removeAll { it.startsWith(prefix) }
+    }
+
     override suspend fun insertCache(movies: List<CachedMovie>) {
+        checkWritable()
         movies.groupBy { it.listKey }.forEach { (key, value) ->
             cache[key] = cache[key].orEmpty() + value
         }
     }
+
+    private fun checkWritable() = check(!failCacheWrites) { "database or disk is full" }
 }
 
+/** Each endpoint is a suspend function, so a test can hold a response back with a CompletableDeferred. */
 class FakeMovieApi(
-    private val movies: (String, Int) -> Response<Movies> = { _, page -> page(page, totalPages = 1) },
-    private val search: (String, Int) -> Response<Movies> = { _, page -> page(page, totalPages = 1) },
-    private val detail: (Int) -> Response<Movie> = { Response.success(movie(it)) }
+    private val movies: suspend (String, Int) -> Response<Movies> = { _, page -> page(page, totalPages = 1) },
+    private val search: suspend (String, Int) -> Response<Movies> = { _, page -> page(page, totalPages = 1) },
+    private val detail: suspend (Int) -> Response<Movie> = { Response.success(movie(it)) }
 ) : MovieApi {
 
     val requestedCategories = mutableListOf<Pair<String, Int>>()

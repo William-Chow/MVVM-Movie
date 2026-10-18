@@ -1,6 +1,7 @@
 package com.mvvmmovie.viewmodel
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.SavedStateHandle
 import com.mvvmmovie.fake.FakeMovieApi
 import com.mvvmmovie.fake.FakeMovieDao
 import com.mvvmmovie.fake.FakeNetworkMonitor
@@ -9,7 +10,9 @@ import com.mvvmmovie.fake.page
 import com.mvvmmovie.model.MovieCategory
 import com.mvvmmovie.model.MovieSort
 import com.mvvmmovie.model.MovieSource
+import com.mvvmmovie.model.Movies
 import com.mvvmmovie.repository.MovieRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,6 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 import retrofit2.Response
 import java.io.IOException
+import java.net.SocketTimeoutException
 
 /**
  * Drives [MovieViewModel] against fake collaborators. The unconfined test dispatcher runs
@@ -77,8 +81,7 @@ class MovieViewModelTest {
         val viewModel = createViewModel(api)
 
         val state = viewModel.observeUiState().value
-        assertTrue(state is MovieUiState.Error)
-        assertEquals(false, (state as MovieUiState.Error).offline)
+        assertEquals(MovieUiState.Error(LoadError.AUTH), state)
     }
 
     @Test
@@ -88,8 +91,7 @@ class MovieViewModelTest {
         val viewModel = createViewModel(FakeMovieApi())
 
         val state = viewModel.observeUiState().value
-        assertTrue(state is MovieUiState.Error)
-        assertTrue((state as MovieUiState.Error).offline)
+        assertEquals(MovieUiState.Error(LoadError.OFFLINE), state)
     }
 
     @Test
@@ -114,8 +116,7 @@ class MovieViewModelTest {
         val viewModel = createViewModel(api)
 
         val state = viewModel.observeUiState().value
-        assertTrue(state is MovieUiState.Error)
-        assertEquals("boom", (state as MovieUiState.Error).message)
+        assertEquals(MovieUiState.Error(LoadError.NETWORK), state)
     }
 
     @Test
@@ -163,7 +164,7 @@ class MovieViewModelTest {
         viewModel.loadNextPage()
 
         assertEquals(listOf(1), viewModel.movieIds())
-        assertEquals("boom", viewModel.observeMessage().value)
+        assertEquals(LoadError.NETWORK, viewModel.observeMessage().value)
 
         viewModel.onMessageShown()
         assertNull(viewModel.observeMessage().value)
@@ -253,7 +254,7 @@ class MovieViewModelTest {
     fun showFavorites_readsFromRoomAndFollowsLaterChanges() = runTest {
         val api = FakeMovieApi(movies = { _, page -> page(page, totalPages = 1, movie(1)) })
         val repository = createRepository(api)
-        val viewModel = MovieViewModel(repository)
+        val viewModel = MovieViewModel(repository, SavedStateHandle())
 
         viewModel.showFavorites()
         assertEquals(MovieUiState.Empty, viewModel.observeUiState().value)
@@ -276,9 +277,162 @@ class MovieViewModelTest {
         assertEquals(listOf("popular" to 1), api.requestedCategories)
     }
 
+    @Test
+    fun serverError_isReportedAsATmdbProblem() {
+        val viewModel = createViewModel(FakeMovieApi(movies = { _, _ -> httpError(503) }))
+
+        assertEquals(MovieUiState.Error(LoadError.SERVER), viewModel.observeUiState().value)
+    }
+
+    @Test
+    fun httpError_withACachedFirstPage_isReportedRatherThanShownAsOffline() {
+        var failing = false
+        val api = FakeMovieApi(movies = { _, page ->
+            if (failing) httpError(401) else page(page, totalPages = 1, movie(1))
+        })
+        createViewModel(api)
+
+        failing = true
+        val viewModel = createViewModel(api)
+
+        assertEquals(MovieUiState.Error(LoadError.AUTH), viewModel.observeUiState().value)
+    }
+
+    @Test
+    fun timeout_withACachedFirstPage_fallsBackToTheCache() {
+        var failing = false
+        val api = FakeMovieApi(movies = { _, page ->
+            if (failing) throw SocketTimeoutException("timeout") else page(page, totalPages = 1, movie(1))
+        })
+        createViewModel(api)
+
+        failing = true
+        val state = createViewModel(api).observeUiState().value
+
+        assertTrue("expected cached Success but was $state", state is MovieUiState.Success)
+        assertTrue((state as MovieUiState.Success).fromCache)
+    }
+
+    @Test
+    fun failedCacheWrite_stillShowsTheLoadedList() {
+        dao.failCacheWrites = true
+
+        val viewModel = createViewModel(FakeMovieApi(movies = { _, page -> page(page, totalPages = 1, movie(1)) }))
+
+        assertEquals(listOf(1), viewModel.movieIds())
+    }
+
+    @Test
+    fun sortBy_onTheErrorScreen_keepsTheErrorAndItsRetry() {
+        val viewModel = createViewModel(FakeMovieApi(movies = { _, _ -> throw IOException("boom") }))
+
+        viewModel.sortBy(MovieSort.RATING)
+
+        assertEquals(MovieUiState.Error(LoadError.NETWORK), viewModel.observeUiState().value)
+    }
+
+    @Test
+    fun sortBy_whileANewListLoads_doesNotBringThePreviousListBack() {
+        val topRated = CompletableDeferred<Response<Movies>>()
+        val api = FakeMovieApi(movies = { category, page ->
+            if (category == "top_rated") topRated.await() else page(page, totalPages = 1, movie(1), movie(2))
+        })
+        val viewModel = createViewModel(api)
+        viewModel.selectCategory(MovieCategory.TOP_RATED)
+
+        viewModel.sortBy(MovieSort.RATING)
+        assertEquals(MovieUiState.Loading, viewModel.observeUiState().value)
+
+        topRated.complete(page(1, totalPages = 1, movie(7, rating = 5.0), movie(8, rating = 9.0)))
+        assertEquals(listOf(8, 7), viewModel.movieIds())
+    }
+
+    @Test
+    fun switchingToFavorites_whileAPageLoads_hidesTheLoadingMoreSpinner() {
+        val api = FakeMovieApi(movies = { _, page ->
+            if (page == 1) page(1, totalPages = 3, movie(1)) else CompletableDeferred<Response<Movies>>().await()
+        })
+        val viewModel = createViewModel(api)
+        viewModel.loadNextPage()
+        assertEquals(true, viewModel.observeLoadingMore().value)
+
+        viewModel.showFavorites()
+
+        assertEquals(false, viewModel.observeLoadingMore().value)
+    }
+
+    @Test
+    fun loadNextPage_stopsAtTheLastPageTmdbServes() {
+        val api = FakeMovieApi(movies = { _, page -> page(page, totalPages = 40_000, movie(page)) })
+        val viewModel = createViewModel(api)
+
+        repeat(600) { viewModel.loadNextPage() }
+
+        assertEquals(500, api.requestedCategories.size)
+        assertEquals("popular" to 500, api.requestedCategories.last())
+    }
+
+    @Test
+    fun search_closedWithoutSearching_keepsTheCurrentList() {
+        val api = FakeMovieApi()
+        val viewModel = createViewModel(api)
+        viewModel.showFavorites()
+
+        viewModel.search(null)
+
+        assertEquals(MovieSource.Favorites, viewModel.observeSource().value)
+        assertEquals(listOf("popular" to 1), api.requestedCategories)
+    }
+
+    @Test
+    fun search_cleared_returnsToTheListTheSearchReplaced() {
+        val viewModel = createViewModel(FakeMovieApi())
+        viewModel.selectCategory(MovieCategory.TOP_RATED)
+        viewModel.search("dune")
+        viewModel.search("arrival")
+
+        viewModel.search(null)
+
+        assertEquals(MovieSource.Category(MovieCategory.TOP_RATED), viewModel.observeSource().value)
+    }
+
+    @Test
+    fun listPickedDuringASearch_isKeptWhenTheSearchCloses() {
+        val viewModel = createViewModel(FakeMovieApi())
+        viewModel.showFavorites()
+        viewModel.search("dune")
+        viewModel.selectCategory(MovieCategory.UPCOMING)
+
+        viewModel.search(null)
+
+        assertEquals(MovieSource.Category(MovieCategory.UPCOMING), viewModel.observeSource().value)
+    }
+
+    @Test
+    fun listSearchAndSort_surviveProcessDeath() {
+        val api = FakeMovieApi(search = { _, page -> page(page, totalPages = 1, movie(9)) })
+        val savedState = SavedStateHandle()
+        createViewModel(api, savedState).apply {
+            showFavorites()
+            search("dune")
+            sortBy(MovieSort.TITLE)
+        }
+
+        // After process death the system builds a fresh ViewModel over the restored handle.
+        val restored = createViewModel(api, savedState)
+
+        assertEquals(MovieSource.Search("dune"), restored.observeSource().value)
+        assertEquals(MovieSort.TITLE, restored.observeSort().value)
+        assertEquals(listOf("dune" to 1, "dune" to 1), api.searchCalls)
+
+        restored.search(null)
+        assertEquals(MovieSource.Favorites, restored.observeSource().value)
+    }
+
     private fun createRepository(api: FakeMovieApi) = MovieRepository(api, dao, networkMonitor)
 
-    private fun createViewModel(api: FakeMovieApi) = MovieViewModel(createRepository(api))
+    private fun createViewModel(api: FakeMovieApi, savedState: SavedStateHandle = SavedStateHandle()) =
+        MovieViewModel(createRepository(api), savedState)
 
     private fun MovieViewModel.movieIds(): List<Int?> {
         val state = observeUiState().value

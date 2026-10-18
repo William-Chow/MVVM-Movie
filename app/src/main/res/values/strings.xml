@@ -7,9 +7,13 @@
     <string name="retry">Retry</string>
     <string name="error_unknown">Something went wrong. Please try again.</string>
     <string name="error_no_network">No network connection. Check your connection and retry.</string>
+    <string name="error_network">Couldn\'t reach TMDB. Check your connection and retry.</string>
+    <string name="error_auth">TMDB rejected this app\'s API key.</string>
+    <string name="error_server">TMDB is having trouble right now. Please try again later.</string>
     <string name="empty_result">No movies found</string>
     <string name="empty_favorites">No favourites yet. Star a movie to keep it here.</string>
-    <string name="offline_showing_cached">Offline — showing the last loaded list</string>
+    <string name="offline_showing_cached">Can\'t connect — showing the last loaded list</string>
+    <string name="offline_showing_saved_detail">Can\'t connect — showing saved details. Tap to retry.</string>
     <string name="no_overview">No overview available.</string>
     <string name="rating_format">★ %1$.1f</string>
 

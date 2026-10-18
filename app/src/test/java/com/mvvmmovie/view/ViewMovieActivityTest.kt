@@ -10,6 +10,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mvvmmovie.R
+import com.mvvmmovie.data.local.FavoriteMovie
 import com.mvvmmovie.data.local.MovieDao
 import com.mvvmmovie.data.local.MovieDatabase
 import com.mvvmmovie.di.ApiModule
@@ -34,6 +35,8 @@ import dagger.hilt.android.testing.HiltTestApplication
 import dagger.hilt.android.testing.UninstallModules
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -154,7 +157,7 @@ class ViewMovieActivityTest {
             settle()
             scenario.onActivity { activity ->
                 assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.errorContainer).visibility)
-                assertEquals("boom", activity.text(R.id.tvError))
+                assertEquals(activity.getString(R.string.error_network), activity.text(R.id.tvError))
                 assertEquals(View.GONE, activity.findViewById<View>(R.id.content).visibility)
             }
         }
@@ -171,6 +174,52 @@ class ViewMovieActivityTest {
                     activity.getString(R.string.error_no_network),
                     activity.text(R.id.tvError)
                 )
+            }
+        }
+    }
+
+    @Test
+    fun offline_withAFavourite_showsTheSavedCopyAndCanStillUnfavourite() = runTest {
+        dao.addFavorite(savedMatrix())
+        (networkMonitor as FakeNetworkMonitor).online = false
+
+        launch().use { scenario ->
+            settle()
+            scenario.onActivity { activity ->
+                assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.content).visibility)
+                assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.tvSavedCopyBanner).visibility)
+                assertEquals("The Matrix", activity.text(R.id.tvTitle))
+                assertEquals("A hacker learns the truth.", activity.text(R.id.tvOverview))
+                activity.viewModelToggle()
+            }
+            settle()
+        }
+
+        assertTrue(dao.observeFavorites().first().isEmpty())
+    }
+
+    @Test
+    fun onlineDetail_hidesTheSavedCopyBanner() {
+        launch().use { scenario ->
+            settle()
+            scenario.onActivity { activity ->
+                assertEquals(View.GONE, activity.findViewById<View>(R.id.tvSavedCopyBanner).visibility)
+            }
+        }
+    }
+
+    @Test
+    fun httpError_isReportedEvenWhenASavedCopyExists() = runTest {
+        dao.addFavorite(savedMatrix())
+        api = FakeMovieApi(detail = {
+            Response.error(401, "{}".toResponseBody("application/json".toMediaType()))
+        })
+
+        launch().use { scenario ->
+            settle()
+            scenario.onActivity { activity ->
+                assertEquals(activity.getString(R.string.error_auth), activity.text(R.id.tvError))
+                assertEquals(View.GONE, activity.findViewById<View>(R.id.content).visibility)
             }
         }
     }
@@ -194,6 +243,16 @@ class ViewMovieActivityTest {
     }
 
     private companion object {
+
+        fun savedMatrix() = FavoriteMovie(
+            id = 603,
+            title = "The Matrix",
+            posterPath = null,
+            voteAverage = 8.2,
+            releaseDate = "1999-03-30",
+            overview = "A hacker learns the truth.",
+            addedAt = 1
+        )
 
         fun video(site: String) = Video().apply {
             id = "v-$site"

@@ -2,6 +2,8 @@ package com.mvvmmovie.model
 
 import androidx.annotation.StringRes
 import com.mvvmmovie.R
+import java.io.Serializable
+import java.util.Locale
 
 /** A TMDB list endpoint under `movie/`. */
 enum class MovieCategory(val path: String, @param:StringRes val labelRes: Int) {
@@ -11,24 +13,32 @@ enum class MovieCategory(val path: String, @param:StringRes val labelRes: Int) {
     UPCOMING("upcoming", R.string.category_upcoming)
 }
 
-/** Where the grid is currently getting its movies from. */
-sealed interface MovieSource {
+/**
+ * Where the grid is currently getting its movies from. Serializable so the ViewModel can keep
+ * it in SavedStateHandle across process death.
+ */
+sealed interface MovieSource : Serializable {
 
     /** A paged, network-backed list. Only these can be handed to the movies endpoint. */
     sealed interface Remote : MovieSource
 
     data class Category(val category: MovieCategory) : Remote
 
-    data class Search(val query: String) : Remote
+    data class Search(val query: String) : Remote {
+        companion object {
+            /** Every search's cache key starts with this, so the searches can be cleared as a group. */
+            const val CACHE_KEY_PREFIX = "search:"
+        }
+    }
 
     /** Local only, so it neither pages nor needs the network. */
     data object Favorites : MovieSource
 
-    /** Stable key for the offline cache table. */
+    /** Stable key for the offline cache table. TMDB search ignores case, so the key does too. */
     val cacheKey: String
         get() = when (this) {
             is Category -> "category:${category.path}"
-            is Search -> "search:$query"
+            is Search -> Search.CACHE_KEY_PREFIX + query.lowercase(Locale.ROOT)
             Favorites -> "favorites"
         }
 }

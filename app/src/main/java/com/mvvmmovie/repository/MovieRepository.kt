@@ -36,54 +36,53 @@ class MovieRepository @Inject constructor(
 
     suspend fun getMovieDetail(id: Int): Result<Movie> = request { api.getMovieDetail(id) }
 
+    /**
+     * The movie as the device last stored it, a favourite first and then any cached list
+     * entry, so the detail screen has something to show offline. Null when neither has it.
+     */
+    suspend fun savedMovie(id: Int): Movie? =
+        dao.favorite(id)?.toMovie() ?: dao.cachedMovie(id)?.toMovie()
+
     // ---- offline copy of the first page ----
 
+    /**
+     * Best effort: a failed write is dropped rather than taking the freshly loaded list down
+     * with it. Each category keeps its own copy; searches share one slot holding the latest,
+     * so ad-hoc queries cannot grow the table without bound.
+     */
     suspend fun cacheFirstPage(source: MovieSource.Remote, movies: List<Movie>) {
-        dao.replaceCache(
-            source.cacheKey,
-            movies.mapIndexedNotNull { index, movie ->
-                val id = movie.id ?: return@mapIndexedNotNull null
-                CachedMovie(
-                    listKey = source.cacheKey,
-                    id = id,
-                    title = movie.title,
-                    posterPath = movie.poster_path,
-                    voteAverage = movie.vote_average,
-                    releaseDate = movie.release_date,
-                    overview = movie.overview,
-                    position = index
-                )
+        val rows = movies.mapIndexedNotNull { index, movie ->
+            val id = movie.id ?: return@mapIndexedNotNull null
+            CachedMovie(
+                listKey = source.cacheKey,
+                id = id,
+                title = movie.title,
+                posterPath = movie.poster_path,
+                voteAverage = movie.vote_average,
+                releaseDate = movie.release_date,
+                overview = movie.overview,
+                position = index
+            )
+        }
+        try {
+            when (source) {
+                is MovieSource.Category -> dao.replaceCache(source.cacheKey, rows)
+                is MovieSource.Search -> dao.replaceCachesWithPrefix(MovieSource.Search.CACHE_KEY_PREFIX, rows)
             }
-        )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            // The cache is only a fallback; the next successful load writes it again.
+        }
     }
 
     suspend fun cachedMovies(source: MovieSource.Remote): List<Movie> =
-        dao.cachedMovies(source.cacheKey).map { cached ->
-            Movie().apply {
-                id = cached.id
-                title = cached.title
-                poster_path = cached.posterPath
-                vote_average = cached.voteAverage
-                release_date = cached.releaseDate
-                overview = cached.overview
-            }
-        }
+        dao.cachedMovies(source.cacheKey).map { it.toMovie() }
 
     // ---- favourites ----
 
     fun observeFavorites(): Flow<List<Movie>> =
-        dao.observeFavorites().map { favorites ->
-            favorites.map { favorite ->
-                Movie().apply {
-                    id = favorite.id
-                    title = favorite.title
-                    poster_path = favorite.posterPath
-                    vote_average = favorite.voteAverage
-                    release_date = favorite.releaseDate
-                    overview = favorite.overview
-                }
-            }
-        }
+        dao.observeFavorites().map { favorites -> favorites.map { it.toMovie() } }
 
     fun observeIsFavorite(id: Int): Flow<Boolean> = dao.observeIsFavorite(id)
 
@@ -124,5 +123,23 @@ class MovieRepository @Inject constructor(
         throw cancellation
     } catch (error: Exception) {
         Result.failure(error)
+    }
+
+    private fun FavoriteMovie.toMovie() = Movie().also { movie ->
+        movie.id = id
+        movie.title = title
+        movie.poster_path = posterPath
+        movie.vote_average = voteAverage
+        movie.release_date = releaseDate
+        movie.overview = overview
+    }
+
+    private fun CachedMovie.toMovie() = Movie().also { movie ->
+        movie.id = id
+        movie.title = title
+        movie.poster_path = posterPath
+        movie.vote_average = voteAverage
+        movie.release_date = releaseDate
+        movie.overview = overview
     }
 }

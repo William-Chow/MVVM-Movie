@@ -11,7 +11,20 @@ def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
-def tmdbApiKey = localProperties.getProperty('TMDB_API_KEY', '')
+def tmdbApiKey = localProperties.getProperty('TMDB_API_KEY', '').trim()
+
+// Without a key the app still builds, then every request comes back 401. Debug builds and unit
+// tests (which use a fake API) only warn; packaging a release fails outright.
+if (tmdbApiKey.isEmpty()) {
+    logger.warn('TMDB_API_KEY is not set in local.properties; every TMDB request will fail with 401.')
+}
+tasks.matching { it.name in ['packageRelease', 'packageReleaseBundle'] }.configureEach {
+    doFirst {
+        if (tmdbApiKey.isEmpty()) {
+            throw new GradleException('TMDB_API_KEY is missing from local.properties; a release cannot be packaged without it.')
+        }
+    }
+}
 
 android {
     namespace 'com.mvvmmovie'

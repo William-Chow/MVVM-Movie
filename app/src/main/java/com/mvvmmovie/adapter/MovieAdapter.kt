@@ -5,10 +5,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.mvvmmovie.R
-import com.mvvmmovie.Utils
 import com.mvvmmovie.databinding.ItemMovieBinding
+import com.mvvmmovie.loadTmdbImage
 import com.mvvmmovie.model.Movie
 
 class MovieAdapter(
@@ -24,11 +22,7 @@ class MovieAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val movie = getItem(position)
-        Glide.with(holder.itemView)
-            .load(Utils.IMAGE_URL + movie.poster_path)
-            .placeholder(R.drawable.ic_no_exist)
-            .error(R.drawable.ic_no_exist)
-            .into(holder.binding.ivMovieImage)
+        holder.binding.ivMovieImage.loadTmdbImage(movie.poster_path)
         holder.binding.tvMovieName.text = movie.title
         holder.binding.ivMovieImage.contentDescription = movie.title
         holder.itemView.setOnClickListener { onMovieClick(movie) }
