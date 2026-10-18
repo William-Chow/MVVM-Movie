@@ -10,10 +10,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuProvider
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.mvvmmovie.R
@@ -40,7 +37,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        applyWindowInsets()
+        fitContentToSystemBars(binding.root)
 
         prepareRecyclerView()
         binding.swipeRefresh.setOnRefreshListener { viewModel.refresh() }
@@ -205,15 +202,6 @@ class MainActivity : AppCompatActivity() {
         MovieSort.RATING -> R.id.sort_rating
         MovieSort.RELEASE_DATE -> R.id.sort_release_date
         MovieSort.TITLE -> R.id.sort_title
-    }
-
-    /** targetSdk 36 draws edge to edge, so the content has to keep clear of the system bars itself. */
-    private fun applyWindowInsets() {
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, windowInsets ->
-            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(left = bars.left, right = bars.right, bottom = bars.bottom)
-            windowInsets
-        }
     }
 
     private companion object {

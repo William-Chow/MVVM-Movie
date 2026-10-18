@@ -11,10 +11,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.core.view.MenuProvider
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import com.mvvmmovie.R
 import com.mvvmmovie.Utils
 import com.mvvmmovie.adapter.CastAdapter
@@ -45,7 +42,7 @@ class ViewMovieActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityViewMovieBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        applyWindowInsets()
+        fitContentToSystemBars(binding.root)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         binding.rvCast.adapter = castAdapter
@@ -173,14 +170,6 @@ class ViewMovieActivity : AppCompatActivity() {
     private fun android.widget.TextView.setTextOrHide(value: String?) {
         text = value
         isVisible = !value.isNullOrBlank()
-    }
-
-    private fun applyWindowInsets() {
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, windowInsets ->
-            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(left = bars.left, right = bars.right, bottom = bars.bottom)
-            windowInsets
-        }
     }
 
     private companion object {
