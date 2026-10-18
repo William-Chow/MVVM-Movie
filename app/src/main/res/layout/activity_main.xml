@@ -6,14 +6,31 @@
     android:layout_height="match_parent"
     tools:context=".view.MainActivity">
 
+    <!-- Sits above the grid rather than over it, so the first row stays fully visible. -->
+    <TextView
+        android:id="@+id/tvOfflineBanner"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@color/purple_700"
+        android:padding="8dp"
+        android:text="@string/offline_showing_cached"
+        android:textAlignment="center"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible" />
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/tvOfflineBanner">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvMovies"
@@ -77,22 +94,6 @@
             android:text="@string/retry" />
 
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvOfflineBanner"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@color/purple_700"
-        android:padding="8dp"
-        android:text="@string/offline_showing_cached"
-        android:textAlignment="center"
-        android:textColor="@color/white"
-        android:textSize="12sp"
-        android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:visibility="visible" />
 
     <ProgressBar
         android:id="@+id/progressBarMore"
